@@ -1,12 +1,12 @@
 import requests
 from bs4 import BeautifulSoup
 
-URL = 'https://auto.ria.com/newauto/marka-peugeot/'
+URL = '****'
 HEADERS = {
     'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.67 Safari/537.36 OPR/87.0.4390.45',
     'accept':'*/*'
 }
-HOST = 'https://auto.ria.com'
+HOST = '****'
 
 def get_html(url, params=None):
 #   Возвращает Http-ответ
