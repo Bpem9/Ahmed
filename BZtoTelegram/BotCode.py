@@ -2,7 +2,7 @@
 from aiogram import Bot, types
 from aiogram.dispatcher import Dispatcher
 from aiogram.utils import executor
-from BZparsing import get_content, checking_for_new_apts
+from BZparsing import get_content, checking_for_new_apts, id_from_database, adding_to_database
 from config import URL, HEADERS, ID_REG, HOUSE_TYPE_REG, HOST, tg_bot_token
 
 bot = Bot(token=tg_bot_token)
@@ -10,7 +10,7 @@ dp = Dispatcher(bot)
 
 @dp.message_handler(commands=['start'])
 async def hello (message: types.Message):
-    await message.reply('Здорова! Напиши чета, я чекну сайт, братан')
+    await message.reply('Здорова! Напиши чета, я чекну базараку, братан')
 
 def test():
 # --- just testing mechanics, not usable function---
@@ -26,7 +26,11 @@ def test():
 @dp.message_handler()
 async def home (message: types.Message):
     html = get_content(URL)
-    result = checking_for_new_apts(html)
+    id_list = id_from_database()
+    result = checking_for_new_apts(html, id_list)
+    # checking if parsed id is already in id_list, returning new_id's list and adding to old_id's list
+    adding_to_database(result, id_list)
+    # adding ids from new_id's list in database
     if not result:
         await message.reply('Пока ничего нового, братан!')
     else:
