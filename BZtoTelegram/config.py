@@ -6,4 +6,4 @@ HEADERS={
 ID_REG = r'/adv/([0-9]{7})(\_)(.*)'
 HOUSE_TYPE_REG = r'(\s?)(.*)(\s)to rent$'
 HOST = 'https://***'
-tg_bot_token = '5330936569:AAFDerX7DkfrmcAZZhKenPCYcrec13RqAdw'
+tg_bot_token = '***'
