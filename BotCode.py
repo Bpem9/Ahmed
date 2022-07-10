@@ -1,11 +1,15 @@
 
+import os
 from aiogram import Bot, types
 from aiogram.dispatcher import Dispatcher
 from aiogram.utils import executor
 from BZparsing import get_content, checking_for_new_apts, id_from_database, adding_to_database
-from config import URL, HEADERS, ID_REG, HOUSE_TYPE_REG, HOST, tg_bot_token
+from config import URL, HEADERS, ID_REG, HOUSE_TYPE_REG, HOST
+from dotenv import load_dotenv
 
-bot = Bot(token=tg_bot_token)
+load_dotenv()
+bot = Bot(token=os.getenv('tg_bot_token'))
+# tg_bot_token - my personal telegram bot token
 dp = Dispatcher(bot)
 
 @dp.message_handler(commands=['start'])

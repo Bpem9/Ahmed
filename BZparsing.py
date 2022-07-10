@@ -1,21 +1,30 @@
 import requests
+import os
 from bs4 import BeautifulSoup
 import json
-import pprint
+from pprint import pprint
 import re
+import psycopg2
+from config import *
+from dotenv import load_dotenv
 
-
-pp = pprint.PrettyPrinter()
-URL = 'https://***/real-estate/houses-and-villas-rent/lemesos-district-limassol/?type_view=line&ordering=newest&price_max=1500'
-HEADERS={
-    'user-agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.5005.115 Safari/537.36 OPR/88.0.4412.53',
-    'accept':'*/*'
-}
-ID_REG = r'/adv/([0-9]{7})(\_)(.*)'
-HOUSE_TYPE_REG = r'(\s?)(.*)(\s)to rent$'
-HOST = 'https://***'
-
-
+def id_from_database():
+    load_dotenv()
+    connection = psycopg2.connect(os.getenv('DATABASE_URL'), sslmode='require')
+    connection.autocommit = True
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('''
+            SELECT flat_id
+            FROM flats
+            ''')
+            id_list = [apt[0] for apt in cursor.fetchall()]
+        return id_list
+    except Exception as e:
+        print(f'[SQL-INFO] Error while working with database: *{e}*')
+    finally:
+        connection.close()
+        print('[SQL-INFO] Database connection successfully closed')
 def get_content(url, params=None):
     r = requests.get(url, params=params, headers=HEADERS)
     return r
@@ -28,49 +37,62 @@ def get_info(html):
             'Тип':re.sub(HOUSE_TYPE_REG,'\\2', apt.find('a').get('content')),
             'Локация' : apt.find_next('meta', attrs={'itemprop': 'areaServed'}).get('content'),
             'Цена' : apt.find_next('meta', attrs = {'itemprop':'price'}).get('content'),
-            'Ссылка':HOST + apt.find('a').get('href')
+            'Ссылка':SITE + apt.find('a').get('href')
         }
     with open('apts_list.json', 'w+') as file:
         json.dump(apts, file, indent=4, ensure_ascii=False)
-
-def checking_for_new_apts(html):
+def checking_for_new_apts(html, id_list):
     with open('apts_list.json', 'r', encoding='windows-1251') as file:
         old_apts = json.loads(file.read())
-
     soup = BeautifulSoup(html.text, 'lxml')
     apts_info = soup.find_all('li', class_='announcement-container')
     new_apts = {}
     for apt in apts_info:
         new_apt_id = re.sub(ID_REG, '\\1', apt.find('a').get('href'))
-        if new_apt_id in old_apts:
-            continue
-        else:
+        if int(new_apt_id) not in id_list:
+            # collecting in variables necessary information (id, type, location, price, link)
             type_of_house = re.sub(HOUSE_TYPE_REG, '\\2', apt.find('a').get('content'))
             house_location = apt.find_next('meta', attrs={'itemprop': 'areaServed'}).get('content')
             price_of_house = apt.find_next('meta', attrs={'itemprop': 'price'}).get('content')
-            link = HOST + apt.find('a').get('href')
-
-            new_apts[re.sub(ID_REG, '\\1', apt.find('a').get('href'))] = {
+            link = SITE + apt.find('a').get('href')
+            # creating a new apts list for messaging to telegram and adding new ones to exsisting apts list
+            old_apts[new_apt_id] = new_apts[new_apt_id] = {
                 'Тип': type_of_house,
                 'Локация': house_location,
                 'Цена': price_of_house,
                 'Ссылка': link
             }
-            old_apts[re.sub(ID_REG, '\\1', apt.find('a').get('href'))] = {
-                'Тип': type_of_house,
-                'Локация': house_location,
-                'Цена': price_of_house,
-                'Ссылка': link
-            }
-
+        else:
+            continue
+    # print(new_apts)
     with open('apts_list.json', 'r+', encoding='windows-1251') as file:
         json.dump(old_apts, file, indent=4, ensure_ascii=False)
-
-#   for new_apt in new_apts:
+    # print(new_apts)
     return new_apts
-#   return f"Тип - {type_of_house},\nЛокация - {house_location},\nЦена - {price_of_house},\nСсылка - {link}"
+def adding_to_database(dict, list):
+    load_dotenv()
+    connection = psycopg2.connect(os.getenv('DATABASE_URL'), sslmode='require')
+    connection.autocommit = True
+    try:
+        with connection.cursor() as cursor:
+            i = 1
+            for key, value in dict.items():
+                cursor.execute('''
+                INSERT INTO flats(pk_flat_id, flat_id, price, address, fl_type, link)
+                VALUES (%s, %s, %s,  %s,  %s,  %s)
+                ''', ((len(list) + i), key, value['Цена'], value['Локация'], value['Тип'], value['Ссылка'])
+                )
+                i += 1
+    except Exception as e:
+        print(f'[SQL-INFO] Error while adding to database: *{e}*')
+    finally:
+        connection.close()
+        print('[SQL-INFO] Database connection successfully closed')
+
 
 if __name__ == '__main__':
     html = get_content(URL)
-    #get_info(html)
-    checking_for_new_apts(html)
+    #get_info(html) # - first time collecting information: creating an 'old_apts' list
+    id_list = id_from_database()
+    print(id_list)
+    adding_to_database(checking_for_new_apts(html, id_list), id_list)
